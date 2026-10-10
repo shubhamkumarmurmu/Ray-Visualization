@@ -4,7 +4,7 @@
 
 ## 📸 Screenshots
 
-![hero](https://github.com/shubhamkumarmurmu/Ray-Visualization/public/hero.png)
+![hero](https://raw.githubusercontent.com/shubhamkumarmurmu/Ray-Visualization/main/public/hero.png)
 
 ## 📑 Table of Contents
 
