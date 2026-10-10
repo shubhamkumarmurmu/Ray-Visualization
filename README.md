@@ -2,6 +2,10 @@
 
 > Real-time 2D raycasting simulating pseudo-3D environments with HTML5 Canvas.
 
+## 📸 Screenshots
+
+![hero](https://github.com/shubhamkumarmurmu/Ray-Visualization/public/hero.png)
+
 ## 📑 Table of Contents
 
 - [Description](#description)
