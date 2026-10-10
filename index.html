@@ -1,0 +1,410 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ray Visualization</title>
+  <link rel="stylesheet" href="index.css" />
+</head>
+
+<body>
+  <h2>Ray Visualization</h2>
+
+  <div class="game">
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+    <div class="side-panel">
+      <canvas id="minimap" width="240" height="240"></canvas>
+
+      <div class="legend">
+        <div><span class="cyan">━</span> Rays and wall hits</div>
+        <div><span class="white">●</span> Player position</div>
+        <div><span class="yellow">━</span> Yellow wall type</div>
+      </div>
+
+      <div class="controls">
+        <b>Controls</b><br />
+        ↑ / ↓ Move forward and backward<br />
+        ← / → Rotate camera<br />
+        W / S Move forward and backward<br />
+        A / D Rotate camera
+      </div>
+
+      <div class="buttons">
+        <button id="toggleRays">Hide rays</button>
+        <button id="reset">Reset player</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const minimap = document.getElementById("minimap");
+    const minimapCtx = minimap.getContext("2d");
+
+    const map = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+
+      [1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1],
+      [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1],
+      [1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1],
+
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+
+      [1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,0,0,0,0,5,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,0,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    const colors = {
+      1: [255, 35, 35],
+      2: [0, 210, 70],
+      3: [35, 95, 255],
+      4: [235, 235, 235],
+      5: [255, 220, 0]
+    };
+
+    const start = {
+      x: 12,
+      y: 12,
+      dirX: -1,
+      dirY: 0
+    };
+
+    let posX = start.x;
+    let posY = start.y;
+
+    let dirX = start.dirX;
+    let dirY = start.dirY;
+
+    let planeX = 0;
+    let planeY = -0.66;
+
+    let showRays = true;
+
+    const moveSpeed = 0.12;
+    const rotSpeed = 0.055;
+
+    function isWall(x, y) {
+      const mx = Math.floor(x);
+      const my = Math.floor(y);
+
+      return (
+        my < 0 ||
+        my >= map.length ||
+        mx < 0 ||
+        mx >= map[my].length ||
+        map[my][mx] !== 0
+      );
+    }
+
+    function movePlayer(amount) {
+      const nextX = posX + dirX * amount;
+      const nextY = posY + dirY * amount;
+
+      if (!isWall(nextX, posY)) posX = nextX;
+      if (!isWall(posX, nextY)) posY = nextY;
+    }
+
+    function rotatePlayer(angle) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const oldDirX = dirX;
+      dirX = dirX * cos - dirY * sin;
+      dirY = oldDirX * sin + dirY * cos;
+
+      const oldPlaneX = planeX;
+      planeX = planeX * cos - planeY * sin;
+      planeY = oldPlaneX * sin + planeY * cos;
+    }
+
+    document.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+
+      if (
+        ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)
+      ) {
+        event.preventDefault();
+      }
+
+      if (key === "arrowup" || key === "w") {
+        movePlayer(moveSpeed);
+      } else if (key === "arrowdown" || key === "s") {
+        movePlayer(-moveSpeed);
+      } else if (key === "arrowleft" || key === "a") {
+        rotatePlayer(rotSpeed);
+      } else if (key === "arrowright" || key === "d") {
+        rotatePlayer(-rotSpeed);
+      }
+    });
+
+    document.getElementById("toggleRays").addEventListener("click", () => {
+      showRays = !showRays;
+      document.getElementById("toggleRays").textContent =
+        showRays ? "Hide rays" : "Show rays";
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      posX = start.x;
+      posY = start.y;
+      dirX = start.dirX;
+      dirY = start.dirY;
+      planeX = 0;
+      planeY = -0.66;
+    });
+
+    function castRay(rayDirX, rayDirY) {
+      let mapX = Math.floor(posX);
+      let mapY = Math.floor(posY);
+
+      const deltaDistX =
+        rayDirX === 0 ? Infinity : Math.abs(1 / rayDirX);
+
+      const deltaDistY =
+        rayDirY === 0 ? Infinity : Math.abs(1 / rayDirY);
+
+      let stepX;
+      let stepY;
+      let sideDistX;
+      let sideDistY;
+
+      if (rayDirX < 0) {
+        stepX = -1;
+        sideDistX = (posX - mapX) * deltaDistX;
+      } else {
+        stepX = 1;
+        sideDistX = (mapX + 1 - posX) * deltaDistX;
+      }
+
+      if (rayDirY < 0) {
+        stepY = -1;
+        sideDistY = (posY - mapY) * deltaDistY;
+      } else {
+        stepY = 1;
+        sideDistY = (mapY + 1 - posY) * deltaDistY;
+      }
+
+      let side = 0;
+      let hit = false;
+
+      const maxSteps = map.length * map[0].length;
+
+      for (let i = 0; i < maxSteps; i++) {
+        if (sideDistX < sideDistY) {
+          sideDistX += deltaDistX;
+          mapX += stepX;
+          side = 0;
+        } else {
+          sideDistY += deltaDistY;
+          mapY += stepY;
+          side = 1;
+        }
+
+        if (
+          mapY < 0 ||
+          mapY >= map.length ||
+          mapX < 0 ||
+          mapX >= map[mapY].length
+        ) {
+          break;
+        }
+
+        if (map[mapY][mapX] > 0) {
+          hit = true;
+          break;
+        }
+      }
+
+      if (!hit) return null;
+
+      let distance;
+
+      if (side === 0) {
+        distance =
+          (mapX - posX + (1 - stepX) / 2) / rayDirX;
+      } else {
+        distance =
+          (mapY - posY + (1 - stepY) / 2) / rayDirY;
+      }
+
+      distance = Math.max(distance, 0.001);
+
+      return {
+        distance,
+        side,
+        mapX,
+        mapY,
+        wallType: map[mapY][mapX],
+        hitX: posX + rayDirX * distance,
+        hitY: posY + rayDirY * distance
+      };
+    }
+
+    function drawWorld() {
+      ctx.fillStyle = "#202633";
+      ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+
+      ctx.fillStyle = "#454545";
+      ctx.fillRect(
+        0,
+        canvas.height / 2,
+        canvas.width,
+        canvas.height / 2
+      );
+
+      const rayHits = [];
+
+      for (let x = 0; x < canvas.width; x++) {
+        const cameraX = (2 * x) / canvas.width - 1;
+
+        const rayDirX = dirX + planeX * cameraX;
+        const rayDirY = dirY + planeY * cameraX;
+
+        const hit = castRay(rayDirX, rayDirY);
+
+        if (!hit) continue;
+
+        if (x % 8 === 0) {
+          rayHits.push({
+            x: hit.hitX,
+            y: hit.hitY
+          });
+        }
+
+        // Perpendicular distance avoids fisheye distortion.
+        const lineHeight = Math.floor(
+          canvas.height / hit.distance
+        );
+
+        const drawStart = Math.max(
+          0,
+          Math.floor(-lineHeight / 2 + canvas.height / 2)
+        );
+
+        const drawEnd = Math.min(
+          canvas.height - 1,
+          Math.floor(lineHeight / 2 + canvas.height / 2)
+        );
+
+        const base = colors[hit.wallType] || [255, 220, 0];
+
+        const distanceShade = Math.max(
+          0.2,
+          1 / (1 + hit.distance * 0.09)
+        );
+
+        const sideShade = hit.side === 1 ? 0.68 : 1;
+        const shade = distanceShade * sideShade;
+
+        const r = Math.floor(base[0] * shade);
+        const g = Math.floor(base[1] * shade);
+        const b = Math.floor(base[2] * shade);
+
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(x, drawStart, 1, drawEnd - drawStart + 1);
+      }
+
+      return rayHits;
+    }
+
+    function drawMinimap(rayHits) {
+      const sx = minimap.width / map[0].length;
+      const sy = minimap.height / map.length;
+
+      minimapCtx.clearRect(
+        0, 0, minimap.width, minimap.height
+      );
+      for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[y].length; x++) {
+          const tile = map[y][x];
+
+          minimapCtx.fillStyle = tile === 0
+            ? "#101010"
+            : `rgb(${colors[tile].join(",")})`;
+
+          minimapCtx.fillRect(
+            x * sx,
+            y * sy,
+            sx,
+            sy
+          );
+
+          minimapCtx.strokeStyle = "#292929";
+          minimapCtx.lineWidth = 0.5;
+          minimapCtx.strokeRect(
+            x * sx,
+            y * sy,
+            sx,
+            sy
+          );
+        }
+      }
+
+      const playerX = posX * sx;
+      const playerY = posY * sy;
+
+      if (showRays) {
+        minimapCtx.strokeStyle = "rgba(0, 255, 255, 0.65)";
+        minimapCtx.lineWidth = 0.8;
+
+        for (const hit of rayHits) {
+          const hitX = hit.x * sx;
+          const hitY = hit.y * sy;
+
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(playerX, playerY);
+          minimapCtx.lineTo(hitX, hitY);
+          minimapCtx.stroke();
+
+          minimapCtx.fillStyle = "#00ffff";
+          minimapCtx.fillRect(hitX - 1, hitY - 1, 2, 2);
+        }
+      }
+
+      minimapCtx.strokeStyle = "#ffffff";
+      minimapCtx.lineWidth = 2;
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(playerX, playerY);
+      minimapCtx.lineTo(
+        playerX + dirX * 16,
+        playerY + dirY * 16
+      );
+      minimapCtx.stroke();
+
+      minimapCtx.fillStyle = "#ffffff";
+      minimapCtx.beginPath();
+      minimapCtx.arc(playerX, playerY, 3, 0, Math.PI * 2);
+      minimapCtx.fill();
+    }
+
+    function render() {
+      const rayHits = drawWorld();
+      drawMinimap(rayHits);
+      requestAnimationFrame(render);
+    }
+
+    render();
+  </script>
+</body>
+</html>
